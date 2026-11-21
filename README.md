@@ -24,14 +24,14 @@ GameFinder scanne ton ordinateur, retrouve tous tes jeux installés — Steam, E
 
 ## 📸 Captures d'écran
 
-> Ajoute tes captures dans `docs/` ou à la racine et remplace ces lignes.
+
 
 ## 🚀 Installation
 
 Prérequis : **Python 3.10+** et **Pillow**
 
 ```powershell
-git clone https://github.com/<ton-pseudo>/GameFinder.git
+git clone https://github.com/CptnMathh/GameFinder.git
 cd GameFinder
 python -m pip install -r requirements.txt
 python main.py
