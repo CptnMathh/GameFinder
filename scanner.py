@@ -47,6 +47,8 @@ class Game:
     description: str = ""
     store_url: str = ""
     launch_args: str = ""
+    metacritic: int = 0
+    metacritic_url: str = ""
 
     @property
     def key(self) -> str:
@@ -85,6 +87,7 @@ DEFAULT_SETTINGS = {
     "locations": [], "layout": "Grille", "columns": 3, "sort": "Nom",
     "show_size": True, "show_drive": True, "show_tags": True, "show_banner": True,
     "favorites": [], "hidden": [], "ignored": [], "categories": [], "assignments": {}, "filters": [],
+    "lang": "en",
 }
 
 
@@ -386,7 +389,7 @@ def steam_metadata(game: Game) -> dict:
         return {}
     cache = load_json("metadata.json", {})
     cached = cache.get(game.app_id)
-    if cached and cached.get("_version") == 2:
+    if cached and cached.get("_version") == 4:
         return cached
     result: dict = {}
     try:
@@ -395,7 +398,9 @@ def steam_metadata(game: Game) -> dict:
         result.update({"type": details.get("type", ""), "description": details.get("short_description", ""), "developer": ", ".join(details.get("developers", [])),
                        "genres": [g.get("description", "") for g in details.get("genres", [])],
                        "categories": [c.get("description", "") for c in details.get("categories", [])],
-                       "art_url": details.get("header_image", ""), "store_url": details.get("steam_appid") and f"https://store.steampowered.com/app/{game.app_id}/"})
+                       "art_url": details.get("header_image", ""), "store_url": details.get("steam_appid") and f"https://store.steampowered.com/app/{game.app_id}/",
+                       "metacritic": (details.get("metacritic") or {}).get("score"),
+                       "metacritic_url": (details.get("metacritic") or {}).get("url", "")})
     except Exception:
         pass
     try:
@@ -408,7 +413,7 @@ def steam_metadata(game: Game) -> dict:
     if not result.get("art_url"):
         result["art_url"] = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{game.app_id}/library_600x900.jpg"
     result["tags"] = result.get("tags") or result.get("genres", [])
-    result["_version"] = 2
+    result["_version"] = 4
     cache[game.app_id] = result
     try: save_json("metadata.json", cache)
     except OSError: pass
@@ -425,6 +430,49 @@ def controller_support(categories: list[str]) -> str:
            or "manettes partielle" in value for value in values):
         return "partial"
     return "unknown"
+
+
+def metacritic_lookup(name: str) -> dict:
+    norm = re.sub(r"[^a-z0-9]+", "", name.casefold())
+    if not norm:
+        return {}
+    cache = load_json("metacritic.json", {})
+    if norm in cache:
+        return cache[norm]
+    result: dict = {}
+    try:
+        request = Request(f"https://www.metacritic.com/search/{quote(name)}/",
+                          headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "en-US,en;q=0.9"})
+        page = urlopen(request, timeout=12).read(4_000_000).decode("utf-8", "replace")
+        candidates = []
+        for match in re.finditer(r'<a href="(/game/[a-z0-9-]+/)"[^>]*>(.*?)</a>', page, re.S):
+            href, block = match.group(1), match.group(2)
+            score_match = re.search(r'Metascore (\d+) out of 100', block)
+            if not score_match:
+                continue
+            title_match = re.search(r'<p[^>]*>([^<]+)</p>', block)
+            title = title_match.group(1).strip() if title_match else ""
+            candidates.append({"title": title, "score": int(score_match.group(1)),
+                               "url": "https://www.metacritic.com" + href})
+        if candidates:
+            stop = {"the", "of", "and", "a", "an", "for", "with", "your", "to", "in", "on", "at"}
+            wanted = {t for t in re.sub(r"[^a-z0-9]+", " ", name.casefold()).split()
+                      if t not in stop and len(t) > 1}
+            def tokens(text: str) -> set:
+                return set(re.sub(r"[^a-z0-9]+", " ", text.casefold()).split())
+            matched = [c for c in candidates if wanted and wanted <= tokens(c["title"])]
+            if matched:
+                result = {"score": matched[0]["score"], "url": matched[0]["url"]}
+                if result["score"] <= 0:
+                    result = {}
+    except Exception:
+        pass
+    cache[norm] = result
+    try:
+        save_json("metacritic.json", cache)
+    except OSError:
+        pass
+    return result
 
 
 def find_store_id(name: str) -> str:

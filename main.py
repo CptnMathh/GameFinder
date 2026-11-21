@@ -73,6 +73,24 @@ def load_games() -> list[scanner.Game]:
 games = load_games()
 settings = get_settings()
 games = [g for g in games if not any((x.get("key") if isinstance(x, dict) else x) == g.key for x in settings.get("ignored", []))]
+play_stats = scanner.load_json("stats.json", {})
+stats_lock = threading.Lock()
+
+
+def track_play_time(key: str, proc, started: float) -> None:
+    def watch():
+        try:
+            proc.wait()
+        except Exception:
+            return
+        secs = int(time.time() - started)
+        if not 5 <= secs <= 30 * 86400:
+            return
+        with stats_lock:
+            entry = play_stats.setdefault(key, {"launches": 0})
+            entry["seconds"] = int(entry.get("seconds", 0)) + secs
+            scanner.save_json("stats.json", play_stats)
+    threading.Thread(target=watch, daemon=True).start()
 
 
 def save_games():
@@ -112,6 +130,20 @@ def public_game(game: scanner.Game) -> dict:
     value = asdict(game)
     value["key"] = game.key
     value["drive"] = game.drive
+    value["stats"] = play_stats.get(game.key)
+    metacritic = game.metacritic or 0
+    metacritic_url = game.metacritic_url or ""
+    if game.app_id.isdigit():
+        meta = scanner.load_json("metadata.json", {}).get(game.app_id, {})
+        metacritic = metacritic or meta.get("metacritic") or 0
+        metacritic_url = metacritic_url or meta.get("metacritic_url") or ""
+    if not metacritic:
+        norm = __import__("re").sub(r"[^a-z0-9]+", "", game.name.casefold())
+        found = scanner.load_json("metacritic.json", {}).get(norm, {})
+        metacritic = found.get("score") or 0
+        metacritic_url = metacritic_url or found.get("url") or ""
+    value["metacritic"] = metacritic or None
+    value["metacritic_url"] = metacritic_url
     if value["source"] == "Dossier scanné":
         value["source"] = "Crack"
     cover_dir = scanner.app_dir() / "covers"
@@ -408,9 +440,16 @@ def scan_worker():
                 game.developer = metadata.get("developer", "")
                 game.description = metadata.get("description", "")
                 game.store_url = metadata.get("store_url") or game.store_url
+                game.metacritic = metadata.get("metacritic") or 0
+                game.metacritic_url = metadata.get("metacritic_url") or ""
                 game.art = scanner.get_art(game, metadata)
             if not game.art:
                 game.art = scanner.get_art(game, {})
+            if not game.metacritic:
+                found = scanner.metacritic_lookup(game.name)
+                if found.get("score"):
+                    game.metacritic = found["score"]
+                    game.metacritic_url = found.get("url", "")
             assignment = settings.get("assignments", {}).get(game.key, {})
             game.tags = list(dict.fromkeys(game.tags + assignment.get("tags", [])))
             fresh.append(game)
@@ -593,6 +632,11 @@ class Handler(BaseHTTPRequestHandler):
                             return self.send_json({"error": str(exc)}, 400)
                         except KeyError as exc:
                             return self.send_json({"error": str(exc.args[0])}, 404)
+                    elif action == "note":
+                        assigned = settings["assignments"].setdefault(game.key, {"tags": []})
+                        note = str(body.get("value", "")).strip()
+                        if note: assigned["notes"] = note
+                        else: assigned.pop("notes", None)
                     scanner.save_json("settings.json", settings)
                     save_games()
                 self.send_json({"ok": True, "settings": settings, "game": public_game(game)})
@@ -639,17 +683,20 @@ class Handler(BaseHTTPRequestHandler):
                 if action == "open":
                     os.startfile(game.path)
                 elif action == "launch":
+                    proc = None
+                    started = time.time()
                     if game.source == "Steam" and game.app_id: os.startfile(f"steam://rungameid/{game.app_id}")
                     elif game.launch and Path(game.launch).is_file():
                         launch_args = str(getattr(game, "launch_args", "") or "").strip()
                         if launch_args:
-                            subprocess.Popen(f'"{game.launch}" {launch_args}', shell=True)
+                            proc = subprocess.Popen(f'"{game.launch}" {launch_args}', shell=True)
                         else:
-                            os.startfile(game.launch)
+                            proc = subprocess.Popen([game.launch])
                     else:
                         exe = scanner.first_game_exe(Path(game.path))
-                        if exe: os.startfile(exe)
+                        if exe: proc = subprocess.Popen([str(exe)])
                         else: return self.send_json({"error": "Aucun exécutable trouvé"}, 400)
+                    if proc is not None: track_play_time(game.key, proc, started)
                 elif action == "uninstall":
                     if not game.uninstall: return self.send_json({"error": "Aucun désinstalleur enregistré"}, 400)
                     if game.uninstall.startswith(("steam://", "com.epicgames.launcher://")): os.startfile(game.uninstall)
@@ -661,6 +708,11 @@ class Handler(BaseHTTPRequestHandler):
                         games[:] = [g for g in games if g.key != game.key]
                         save_games()
                 else: return self.send_json({"error": "action inconnue"}, 400)
+                if action == "launch":
+                    entry = play_stats.setdefault(game.key, {"launches": 0})
+                    entry["launches"] = int(entry.get("launches", 0)) + 1
+                    entry["last_played"] = time.strftime("%Y-%m-%d %H:%M")
+                    scanner.save_json("stats.json", play_stats)
                 self.send_json({"ok": True})
             elif path == "/api/open-firefox":
                 if not app_url or not launch_in_firefox(app_url):

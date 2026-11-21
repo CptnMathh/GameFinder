@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10131b"><title>GameFinder</title><link rel="icon" type="image/png" sizes="128x128" href="/icon.png"><link rel="apple-touch-icon" href="/icon.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <canvas id="liquidCanvas" aria-hidden="true"></canvas>
+  <canvas id="liquidFallbackCanvas" aria-hidden="true"></canvas>
+  <div id="scanProgress" class="scan-progress hidden"></div>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><img class="brand-mark" src="/icon.png" alt=""><div><b>GAMEFINDER</b><small data-i18n="brand.tagline">Ta bibliothèque PC</small></div></div>
+      <div class="side-label" data-i18n="nav.library">BIBLIOTHÈQUE</div>
+      <nav id="primaryNav" class="nav"></nav>
+      <div class="side-separator"></div>
+      <div class="side-heading"><span data-i18n="nav.categories">MES CATÉGORIES</span><span><button id="manageCategories" class="icon-btn" data-i18n-title="cat.manageTitle" title="Modifier les catégories">↕</button><button id="addCategory" class="icon-btn" data-i18n-title="cat.addTitle" title="Créer une catégorie">＋</button></span></div>
+      <nav id="categoryNav" class="nav compact"></nav>
+      <div class="sidebar-bottom"><span class="status-dot"></span><span id="sideStatus" data-i18n="status.saved">Bibliothèque enregistrée localement</span><button id="openFirefox" class="sidebar-firefox" data-i18n-title="btn.openBrowserTitle" data-i18n-aria="btn.openBrowser" title="Ouvrir GameFinder dans Firefox" aria-label="Ouvrir GameFinder dans Firefox">Open GameFinder ↗</button></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="title-block"><div class="eyebrow" data-i18n="top.eyebrow">TON ESPACE DE JEU</div><h1 id="pageTitle">Tous les jeux</h1></div>
+        <div class="top-actions"><button id="settingsBtn" class="button subtle">⚙ <span data-i18n="btn.settings">Paramètres</span></button><button id="scanBtn" class="button primary">⟳ <span data-i18n="btn.scan">Scanner les jeux</span></button><button id="quitBtn" class="button quit-button" data-i18n-title="btn.quitTitle" title="Fermer GameFinder">⏻ <span data-i18n="btn.quit">Quitter</span></button></div>
+      </header>
+      <section id="libraryToolbar" class="library-toolbar-wrap">
+        <div class="toolbar">
+          <button id="filterToggle" class="button subtle filter-toggle" aria-expanded="false">☷ <span data-i18n="btn.filters">Filtres</span></button>
+          <label class="search"><span>⌕</span><input id="searchInput" data-i18n-ph="search.placeholder" placeholder="Rechercher un jeu, un tag…"><kbd>Ctrl K</kbd></label>
+          <span id="gameCount" class="count-pill">0 jeux</span>
+          <button id="sortSelect" class="select sort-button" type="button" data-i18n-aria="sort.title" data-i18n-title="sort.title" aria-label="Trier" title="Choisir le tri">Nom ↑</button>
+          <button id="viewToggle" class="button subtle view-toggle">▦ <span data-i18n="layout.list">Liste</span></button>
+          <button id="randomGame" class="button subtle" data-i18n-title="random.hint" title="Ouvrir un jeu au hasard dans la sélection">🎲 <span data-i18n="btn.random">Au hasard</span></button>
+        </div>
+        <div id="filterToolbar" class="filter-toolbar hidden">
+          <span class="filter-caption" data-i18n="filter.caption">AFFINER</span>
+          <label class="filter-select-label"><span data-i18n="filter.genre">Genre</span><select id="genreFilter" class="select"><option value="" data-i18n="filter.allGenres">Tous les genres</option></select></label>
+          <label class="filter-select-label"><span data-i18n="filter.drive">Disque</span><select id="driveFilter" class="select"><option value="" data-i18n="filter.allDrives">Tous les disques</option></select></label>
+          <label class="filter-select-label"><span data-i18n="filter.type">Type</span><select id="typeFilter" class="select"><option value="" data-i18n="filter.allTypes">Tous</option><option>Steam</option><option>Epic Games</option><option>Windows</option><option>Crack</option></select></label>
+          <label class="filter-select-label" data-i18n-title="filter.uninstallDesc" title="Acheter : une désinstallation est disponible · Crack : jeu trouvé dans un dossier seul · Inconnu : aucune des deux informations"><span data-i18n="filter.uninstallTitle">Crack</span><select id="uninstallFilter" class="select" data-i18n-aria="filter.uninstallTitle" aria-label="Filtre Crack"><option value="" data-i18n="filter.uninstallAll">Tout</option><option value="buy" data-i18n="filter.uninstallBuy">Acheter</option><option value="crack" data-i18n="filter.uninstallCrack">Crack</option><option value="unknown" data-i18n="filter.uninstallUnknown">Inconnu</option></select></label>
+          <label class="filter-select-label"><span data-i18n="filter.controller">Manette</span><select id="controllerFilter" class="select"><option value="" data-i18n="filter.ctrlAny">Indifférent</option><option value="full" data-i18n="filter.ctrlFull">Prise en charge</option><option value="partial" data-i18n="filter.ctrlPartial">Partielle</option><option value="unknown" data-i18n="filter.ctrlUnknown">Non renseignée</option></select></label>
+          <label class="filter-select-label"><span data-i18n="filter.image">Visuel</span><select id="imageFilter" class="select"><option value="" data-i18n="filter.imgAll">Tous</option><option value="yes" data-i18n="filter.imgYes">Image disponible</option><option value="no" data-i18n="filter.imgNo">À compléter</option></select></label>
+          <label class="filter-select-label range-filter"><span data-i18n="filter.sizeMin">Taille min.</span> <b id="sizeMinLabel">0 Go</b><input id="sizeMinRange" type="range" min="0" max="1000" value="0"></label>
+          <label class="filter-select-label range-filter"><span data-i18n="filter.sizeMax">Taille max.</span> <b id="sizeMaxLabel" data-i18n="filter.noLimit">Sans limite</b><input id="sizeRange" type="range" min="1" max="1000" value="1000"></label>
+          <label class="filter-check-label"><input id="favoritesFilter" type="checkbox"> <span data-i18n="filter.favorites">Favoris seulement</span></label>
+          <div id="savedFiltersInline" class="saved-filters-inline"></div>
+          <button id="clearFilters" class="clear-filter-button hidden" data-i18n-title="filter.clearTitle" title="Effacer les filtres actifs" data-i18n="btn.clearFilters">Effacer</button>
+          <button id="addFilter" class="button subtle add-filter-button" data-i18n-title="addFilter.title" title="Créer un filtre enregistré" data-i18n="btn.addFilter">＋ Filtre</button>
+        </div>
+      </section>
+      <section id="libraryPage" class="page library-page"><div id="gameGrid" class="game-grid"></div></section>
+      <section id="gameDetailPage" class="page game-detail-page hidden"></section>
+      <section id="storagePage" class="page storage-page hidden"><div id="storageContent" class="storage-content"></div></section>
+      <footer class="footer"><span id="statusText" data-i18n="footer.ready">Prêt.</span><span id="lastScan"></span></footer>
+    </main>
+  </div>
+
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-backdrop" data-close="settings"></div>
+    <div class="modal-panel settings-panel">
+      <div class="modal-header"><div><div class="eyebrow" data-i18n="settings.eyebrow">PERSONNALISATION</div><h2 id="settingsTitle" data-i18n="settings.title">Paramètres généraux</h2><p data-i18n="settings.subtitle">Les réglages sont enregistrés automatiquement.</p></div><button class="close-btn" data-close="settings">×</button></div>
+      <div class="settings-section"><h3 data-i18n="settings.locations.title">Emplacements à scanner</h3><p><span data-i18n="settings.locations.desc">Ajoute plusieurs bibliothèques, par exemple</span> <code>D:\SteamLibrary\steamapps\common</code>.</p>
+        <div id="locationList" class="location-list"></div>
+        <div class="location-add"><input id="locationInput" data-i18n-ph="settings.locations.placeholder" placeholder="D:\Jeux ou E:\SteamLibrary\steamapps\common"><button id="browseLocation" class="button subtle" type="button" data-i18n="settings.locations.browse">📁 Parcourir…</button><button id="addLocation" class="button subtle" type="button" data-i18n="settings.locations.add">＋ Ajouter</button></div>
+        <small data-i18n="settings.locations.hint">Steam, Epic, Rockstar, Ubisoft, EA/Origin, Riot, Battle.net, GOG et les jeux enregistrés par Windows sont recherchés.</small>
+        <div class="location-add"><input id="manualGamePath" data-i18n-ph="settings.manual.placeholder" placeholder="Dossier, .exe, .lnk ou &quot;jeu.exe&quot; --play arg"><button id="browseManualGame" class="button subtle" type="button" data-i18n-title="settings.manual.browseTitle" title="Choisir un fichier de jeu">📁</button><button id="addManualGame" class="button subtle" type="button" data-i18n="settings.manual.add">＋ Ajouter un jeu</button></div>
+      </div>
+      <details class="settings-section ignored-details" id="ignoredDetails"><summary class="ignored-summary"><span class="ignored-heading" data-i18n="settings.ignored.title">Éléments ignorés</span><span class="ignored-count" id="ignoredCount"></span><span class="ignored-chevron" aria-hidden="true">▾</span></summary><p data-i18n="settings.ignored.desc">Ces faux positifs ne seront plus ajoutés lors des prochains scans. Tu peux les restaurer ici.</p><div id="ignoredList" class="location-list"></div></details>
+      <div class="settings-section"><h3 data-i18n="settings.display.title">Affichage</h3>
+        <div class="settings-grid">
+          <label><span data-i18n="settings.layout">Vue par défaut</span><select id="settingLayout" class="select"><option value="Grille" data-i18n="layout.grid">Grille</option><option value="Liste" data-i18n="layout.list">Liste</option></select></label>
+          <label><span data-i18n="settings.columns">Cartes par ligne</span><select id="settingColumns" class="select"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
+          <label class="check-setting"><input id="settingSize" type="checkbox"> <span data-i18n="settings.showSize">Afficher la taille</span></label>
+          <label class="check-setting"><input id="settingDrive" type="checkbox"> <span data-i18n="settings.showDrive">Afficher le disque</span></label>
+          <label class="check-setting"><input id="settingTags" type="checkbox"> <span data-i18n="settings.showTags">Afficher les tags</span></label>
+          <label class="check-setting"><input id="settingBanner" type="checkbox"> <span data-i18n="settings.showBanner">Bannières en mode liste</span></label>
+          <label><span data-i18n="settings.lang">Langue</span><select id="settingLang" class="select"></select></label>
+        </div>
+      </div>
+      <div class="settings-section settings-storage-shortcut"><div><h3 data-i18n="settings.storage.title">Disques et espace occupé</h3><p data-i18n="settings.storage.desc">Retrouve l’espace utilisé par chaque jeu et le total par disque.</p></div><button id="settingsStorage" class="button subtle" data-i18n="settings.storage.btn">Voir les disques →</button><button id="exportLibrary" class="button subtle" data-i18n="export.btn">Exporter (JSON)</button></div>
+      <div class="modal-footer"><button class="button primary" data-close="settings" data-i18n="settings.done">Terminé</button></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/i18n.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
