@@ -23,8 +23,6 @@ GameFinder scanne ton ordinateur, retrouve tous tes jeux installés — Steam, E
 - **100 % local** : serveur `127.0.0.1` avec token d'authentification, données dans `%APPDATA%\GameFinder`
 - **7 langues** : Français, English, Español, Deutsch, Italiano, 日本語, 中文 — sélection dans Paramètres → Affichage
 
-## 📸 Captures d'écran
-
 
 ## 📸 Captures d'écran
 
