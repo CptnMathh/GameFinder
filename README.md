@@ -24,7 +24,12 @@ GameFinder scanne ton ordinateur, retrouve tous tes jeux installés — Steam, E
 
 ## 📸 Captures d'écran
 
-
+![GameFinder](docs/1.png)
+![GameFinder](docs/2.png)
+![GameFinder](docs/3.png)
+![GameFinder](docs/4.png)
+![GameFinder](docs/5.png)
+![GameFinder](docs/6.png)
 
 ## 🚀 Installation
 
